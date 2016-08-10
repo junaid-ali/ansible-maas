@@ -1,0 +1,96 @@
+---
+# Copyright 2016 Internet Solutions (Pty) Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# (c) 2016 Donovan Francesco <donovan.francesco@is.co.za>
+# (c) 2016 Paul Stevens <paul.stevens@is.co.za>
+#
+
+- name: Check apt last update file
+  stat:
+    path: /var/cache/apt
+  register: apt_cache_stat
+  tags:
+    - maas-apt-packages
+
+- name: Update apt if needed
+  apt:
+    update_cache: yes
+  when: "ansible_date_time.epoch|float - apt_cache_stat.stat.mtime > {{cache_timeout}}"
+  tags:
+    - maas-apt-packages
+
+- name: Install maas pre packages
+  apt:
+    pkg: "{{ item }}"
+    state: latest
+  register: install_packages
+  until: install_packages|success
+  retries: 5
+  delay: 2
+  with_items: "{{ maas_pre_packages }}"
+  tags:
+    - maas-pre-apt-packages
+
+- name: Add maas apt-keys
+  apt_key:
+    id: "{{ item.hash_id }}"
+    keyserver: "{{ item.keyserver | default(omit) }}"
+    data: "{{ item.data | default(omit) }}"
+    url: "{{ item.url | default(omit) }}"
+    state: "present"
+  register: add_keys
+  until: add_keys|success
+  ignore_errors: True
+  retries: 5
+  delay: 2
+  with_items: "{{ maas_gpg_keys }}"
+  tags:
+    - maas-apt-keys
+
+- name: Add maas apt-keys using fallback keyserver
+  apt_key:
+    id: "{{ item.hash_id }}"
+    keyserver: "{{ item.fallback_keyserver | default(omit) }}"
+    url: "{{ item.fallback_url | default(omit) }}"
+    state: "present"
+  register: add_keys_fallback
+  until: add_keys_fallback|success
+  retries: 5
+  delay: 2
+  with_items: "{{ maas_gpg_keys }}"
+  when: add_keys|failed and (item.fallback_keyserver is defined or item.fallback_url is defined)
+  tags:
+    - maas-apt-keys
+
+- name: Add maas repo(s)
+  apt_repository:
+    repo: "{{ maas_repo.repo }}"
+    state: "{{ maas_repo.state }}"
+  when:
+    - maas_repo.repo is defined
+    - maas_repo.state is defined
+  register: add_repos
+  until: add_repos|success
+  retries: 5
+  delay: 2
+  tags:
+    - maas-repos
+
+- name: Update apt if necessary
+  apt:
+    update_cache: yes
+  when: add_repos|changed
+  tags:
+    - maas-repos
