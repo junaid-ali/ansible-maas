@@ -15,8 +15,6 @@
 #
 # (c) 2016 Donovan Francesco <donovan.francesco@is.co.za>
 # (c) 2016 Paul Stevens <paul.stevens@is.co.za>
-#
-
 - name: Check apt last update file
   stat:
     path: /var/cache/apt

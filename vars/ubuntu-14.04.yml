@@ -15,12 +15,28 @@
 #
 # (c) 2016 Donovan Francesco <donovan.francesco@is.co.za>
 # (c) 2016 Paul Stevens <paul.stevens@is.co.za>
-- name: Gather variables for each operating system
-  include_vars: "{{ item }}"
-  with_first_found:
-    - "{{ ansible_distribution | lower }}-{{ ansible_distribution_version | lower }}.yml"
-    - "{{ ansible_distribution | lower }}.yml"
-    - "{{ ansible_os_family | lower }}-{{ ansible_distribution_version.split('.')[0] }}.yml"
-    - "{{ ansible_os_family | lower }}.yml"
-  tags:
-    - always
+#
+cache_timeout: 600
+
+maas_apt_repo_url: "http://ppa.launchpad.net/maas/next/ubuntu"
+maas_repo:
+  repo: "deb {{ maas_apt_repo_url }} {{ ansible_distribution_release }} main"
+  state: "present"
+
+# maas GPG Keys
+maas_gpg_keys:
+  - key_name: 'maas'
+    keyserver: 'hkp://keyserver.ubuntu.com:80'
+    fallback_keyserver: 'hkp://p80.pool.sks-keyservers.net:80'
+    hash_id: '0x3ab6dcf1f234e78daa9c104204e7fdc5684d4a1c'
+
+# Common apt packages
+maas_pre_packages:
+  - python-software-properties
+  - software-properties-common
+  - debconf-utils
+
+maas_apt_packages:
+  - maas
+  - maas-dhcp
+  - maas-dns
